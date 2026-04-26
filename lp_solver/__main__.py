@@ -1,11 +1,10 @@
-import time
-
 import argparse
 import dataclasses
 import enum
 import highspy
 import logging
 import pathlib
+import timeit
 
 
 def _setup_logging() -> None:
@@ -27,6 +26,7 @@ class Solver(enum.StrEnum):
 class Arguments:
     input: pathlib.Path
     solver: Solver
+    times: int
     verbose: bool
 
 
@@ -49,6 +49,12 @@ def _read_args() -> Arguments:
         help="Solver to use"
     )
     ap.add_argument(
+        "-n", "--times",
+        type=int,
+        default=1,
+        help="Number of times to solve to average runtime"
+    )
+    ap.add_argument(
         "--verbose",
         action="store_true",
         required=False,
@@ -58,6 +64,7 @@ def _read_args() -> Arguments:
     return Arguments(
         input=args.input,
         solver=args.solver,
+        times=args.times,
         verbose=args.verbose,
     )
 
@@ -65,15 +72,17 @@ def _read_args() -> Arguments:
 @dataclasses.dataclass(frozen=True)
 class Solution:
     objective_value: float
-    runtime: float
+    average_runtime: float
     status: str
 
 
-def _solve(input: pathlib.Path, solver: Solver) -> Solution:
+def _solve(input: pathlib.Path, solver: Solver, n: int = 1) -> Solution:
     """
     Solves the problem given in input file.
     :rtype: result of solving this problem.
     """
+    assert n > 0, "Number of times should be positive."
+    
     filename = str(input)
     highs = highspy.Highs()
     highs.setOptionValue("output_flag", False)
@@ -92,24 +101,26 @@ def _solve(input: pathlib.Path, solver: Solver) -> Solution:
         case Solver.INTERIOR_POINT:
             highs.setOptionValue('solver', 'ipm')
 
-    start_time = time.process_time()
-    highs.run()
-    end_time = time.process_time()
+    def clear_run():
+        highs.clearSolver()
+        highs.run()
+
+    total_runtime = timeit.timeit(clear_run, number=n)
 
     return Solution(
         objective_value=highs.getInfo().objective_function_value,
-        runtime=end_time - start_time,
+        average_runtime=total_runtime / n,
         status=highs.modelStatusToString(highs.getModelStatus()),
     )
 
 
 def _format_result(r: Solution) -> str:
     return (
-        "=== Result ===\n"
-        f"Status         : {r.status}\n"
-        f"Objective      : {r.objective_value:.10e}\n"
-        f"Runtime (sec)  : {r.runtime}\n"
-        "==============="
+        "==== Result ====\n"
+        f"Status                : {r.status}\n"
+        f"Objective             : {r.objective_value:.10e}\n"
+        f"Average Runtime (sec) : {r.average_runtime}\n"
+        "================"
     )
 
 
@@ -117,7 +128,7 @@ def _main():
     args = _read_args()
     if args.verbose:
         _setup_logging()
-    result = _solve(args.input, args.solver)
+    result = _solve(args.input, args.solver, n=args.times)
     print(_format_result(result))
 
 

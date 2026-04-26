@@ -10,7 +10,7 @@ fi
 for file in "$INPUT_DIR"/*; do
   for solver in primal dual ip; do
     echo "Running $file with solver=$solver"
-    python -m lp_solver -i "$file" -s "$solver"
+    python -m lp_solver -i "$file" -s "$solver" -n 100
     echo
   done
 done

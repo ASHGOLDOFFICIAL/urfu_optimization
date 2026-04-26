@@ -107,7 +107,7 @@ def _format_result(r: Solution) -> str:
     return (
         "=== Result ===\n"
         f"Status         : {r.status}\n"
-        f"Objective      : {r.objective_value}\n"
+        f"Objective      : {r.objective_value:.10e}\n"
         f"Runtime (sec)  : {r.runtime}\n"
         "==============="
     )
